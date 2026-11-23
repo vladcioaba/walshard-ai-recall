@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Walshard AI Recall</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d97757'/%3E%3Cpath d='M9 22l7-12 7 12' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <header class="brand">
+        <div class="logo">▲</div>
+        <div>
+          <h1>AI Recall</h1>
+          <p class="muted" id="scan-info">scanning…</p>
+        </div>
+        <button class="icon-btn" id="stats-btn" title="Usage &amp; cost statistics (s)">$</button>
+        <button class="icon-btn" id="refresh" title="Rescan (r)">↻</button>
+      </header>
+      <div class="search">
+        <input id="q" type="search" placeholder="Find project, title, memory…  ( / )" autocomplete="off">
+        <select id="sort" title="Sort projects" aria-label="Sort projects">
+          <option value="lastActive">Last active</option>
+          <option value="name">Name</option>
+          <option value="cost">Cost</option>
+          <option value="tokens">Tokens</option>
+          <option value="sessions">Sessions</option>
+          <option value="prompts">Prompts</option>
+          <option value="memory">Memory</option>
+        </select>
+      </div>
+      <div class="chips" id="chips"></div>
+      <ul class="list" id="list" role="listbox"></ul>
+    </aside>
+    <main class="detail" id="detail">
+      <div class="empty">
+        <p>Select a project</p>
+        <p class="muted small">↑ ↓ to move · / to search · r to rescan</p>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

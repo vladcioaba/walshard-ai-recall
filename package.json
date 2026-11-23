@@ -1,0 +1,28 @@
+{
+  "name": "walshard-ai-recall",
+  "version": "0.1.0",
+  "description": "Walshard AI Recall: find, inspect and resume every AI coding-agent project (Claude Code, Copilot, Codex, VS Code Copilot Chat) \u2014 local only.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "airecall": "bin/airecall.js"
+  },
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "list": "node src/cli.ts list",
+    "ui": "node src/cli.ts ui",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'test/*.test.ts'"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vladcioaba/walshard-ai-recall.git"
+  }
+}
