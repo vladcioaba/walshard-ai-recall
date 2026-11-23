@@ -1,5 +1,16 @@
 import fs from 'node:fs';
 import readline from 'node:readline';
+import { version } from './version.ts';
+
+// node:sqlite (used read-only for Copilot todos) prints an ExperimentalWarning on every run; hide just that one.
+{
+  const emit = process.emitWarning.bind(process);
+  process.emitWarning = ((warning: string | Error, ...rest: any[]) => {
+    const msg = typeof warning === 'string' ? warning : warning?.message;
+    if (typeof msg === 'string' && msg.includes('SQLite is an experimental feature')) return;
+    return (emit as any)(warning, ...rest);
+  }) as typeof process.emitWarning;
+}
 import { scanAll } from './scan.ts';
 import { search } from './search.ts';
 import { computeStats } from './stats.ts';
@@ -27,6 +38,31 @@ const badge = (t: Tool) => c(BADGE[t][0])(BADGE[t][1]);
  * It never evals program output: `airecall go --handoff` prints `dir<TAB>tool<TAB>id`, and the
  * function cd's to the dir and runs a fixed command chosen by tool, with the id re-validated.
  */
+/**
+ * PowerShell equivalent: add to $PROFILE once (`airecall init powershell >> $PROFILE`).
+ * Calls the real airecall.cmd shim (Application) so the function doesn't recurse, never evaluates output.
+ */
+const POWERSHELL_FUNCTION = `# airecall: bare \`airecall\` opens the browser picker, then cd's + resumes the chosen session
+function airecall {
+  $exe = Get-Command airecall -CommandType Application, ExternalScript -ErrorAction Stop | Select-Object -First 1
+  if ($args.Count -gt 0) { & $exe @args; return }
+  $out = & $exe go --handoff
+  if ($LASTEXITCODE -ne 0 -or -not $out) { return }
+  $parts = ([string]($out | Select-Object -Last 1)).Split([char]9)
+  if ($parts.Count -ne 3) { Write-Error 'airecall: bad handoff'; return }
+  $dir, $tool, $id = $parts
+  if (-not [System.IO.Path]::IsPathRooted($dir)) { Write-Error 'airecall: refusing path'; return }
+  if ($id -and $id -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$') { Write-Error 'airecall: refusing session id'; return }
+  if ($tool -cnotin @('claude', 'copilot-cli', 'codex')) { Write-Error 'airecall: unknown tool'; return }
+  Set-Location -LiteralPath $dir
+  switch ($tool) {
+    'claude'      { if ($id) { claude --resume $id } else { claude --resume } }
+    'copilot-cli' { if ($id) { copilot --resume $id } else { copilot --resume } }
+    'codex'       { if ($id) { codex resume $id } else { codex resume } }
+  }
+}
+`;
+
 const SHELL_FUNCTION = `# airecall: bare \`airecall\` opens the browser picker, then cd's + resumes the chosen session
 airecall() {
   if [ $# -ne 0 ]; then command airecall "$@"; return; fi
@@ -63,10 +99,12 @@ ${bold('Usage')}
                                  prints a resume command (or just the path)
   airecall forget <filter|session-id>   delete matching sessions from airecall's index
   airecall purge                    delete airecall's whole index (${tildify(STORE_FILE)})
+  airecall version               print the installed version (also --version, -v)
   airecall help
 
 ${bold('Setup')} (once — writes a static function, nothing is eval'd at shell startup):
-  airecall init zsh >> ~/.zshrc      ${dim('# or ~/.bashrc')}
+  airecall init zsh >> ~/.zshrc               ${dim('# bash: ~/.bashrc')}
+  airecall init powershell >> $PROFILE        ${dim('# Windows PowerShell')}
 
 ${bold('Terminal-only picker')}:
   cr() { local p; p="$(airecall pick "$@")" || return; cd "$p" && claude --resume; }
@@ -167,9 +205,13 @@ async function main(argv: string[]): Promise<void> {
         process.stderr.write(dim('tip: `airecall init zsh >> ~/.zshrc` once, and bare `airecall` will cd + resume for you\n'));
       process.exit(0);
     }
-    case 'init':
-      process.stdout.write(SHELL_FUNCTION);
+    case 'init': {
+      const shell = (args[0] ?? (process.platform === 'win32' ? 'powershell' : 'zsh')).toLowerCase();
+      if (['powershell', 'pwsh', 'ps'].includes(shell)) process.stdout.write(POWERSHELL_FUNCTION);
+      else if (['zsh', 'bash', 'sh'].includes(shell)) process.stdout.write(SHELL_FUNCTION);
+      else return fail(`unsupported shell "${shell}" — use zsh, bash or powershell`);
       return;
+    }
     case 'forget': {
       if (!args.length) return fail('usage: airecall forget <project filter | session id>');
       const q = args.join(' ');
@@ -180,12 +222,24 @@ async function main(argv: string[]): Promise<void> {
     case 'purge':
       process.stdout.write(purge() ? `deleted ${tildify(STORE_FILE)}\n` : 'nothing to delete\n');
       return;
+    case 'version':
+    case '--version':
+    case '-v':
+    case '-V':
+      process.stdout.write(`walshard-ai-recall ${version()}\n`);
+      return;
     case 'help':
     case '--help':
     case '-h':
       process.stdout.write(HELP);
       return;
     default:
+      // unknown options must not silently turn into a project search (e.g. old builds: `-v` listed projects)
+      if (cmd.startsWith('-')) {
+        fail(`unknown option "${cmd}" — try: airecall help`);
+        process.exitCode = 2;
+        return;
+      }
       // `airecall foo` == `airecall list foo`
       return main(['list', cmd, ...rest]);
   }
@@ -368,16 +422,18 @@ function relDate(ms: number): string {
 
 function ask(q: string): Promise<string> {
   return new Promise((resolve) => {
-    let input: fs.ReadStream;
+    let input: NodeJS.ReadableStream & { destroy?: () => void };
     try {
-      input = fs.createReadStream('', { fd: fs.openSync('/dev/tty', 'r') });
+      // Windows has no /dev/tty; its console input is CONIN$ (works even when stdout is captured)
+      input = fs.createReadStream('', { fd: fs.openSync(process.platform === 'win32' ? 'CONIN$' : '/dev/tty', 'r') });
     } catch {
-      return resolve('');
+      if (!process.stdin.isTTY) return resolve('');
+      input = process.stdin;
     }
     const rl = readline.createInterface({ input, output: process.stderr });
     rl.question(q, (a) => {
       rl.close();
-      input.destroy();
+      if (input !== process.stdin) input.destroy?.();
       resolve(a.trim());
     });
   });

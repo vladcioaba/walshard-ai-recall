@@ -269,3 +269,5 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
 .hbar { height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; }
 td .hbar-wrap { width: 120px; }
 .note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+.brand h1 .ver { font-size: 11px; font-weight: 500; color: var(--faint); letter-spacing: 0; margin-left: 4px; font-variant-numeric: tabular-nums; }

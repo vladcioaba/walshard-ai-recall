@@ -43,6 +43,13 @@ npm install -g walshard-ai-recall
 airecall init zsh >> ~/.zshrc   # or ~/.bashrc; static function, nothing eval'd at startup
 ```
 
+Windows (PowerShell):
+
+```powershell
+npm install -g walshard-ai-recall
+airecall init powershell >> $PROFILE   # then open a new PowerShell window
+```
+
 From source (development):
 
 ```bash

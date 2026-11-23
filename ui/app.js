@@ -652,7 +652,12 @@ document.addEventListener('keydown', (e) => {
 
 async function initPick() {
   try {
-    state.pick = !!(await (await api('/api/config')).json()).pick;
+    const cfg = await (await api('/api/config')).json();
+    state.pick = !!cfg.pick;
+    if (typeof cfg.version === 'string') {
+      $('#ver').textContent = 'v' + cfg.version;
+      document.title = `Walshard AI Recall v${cfg.version}`;
+    }
   } catch {}
   if (!state.pick) return;
   document.body.classList.add('pick-mode');

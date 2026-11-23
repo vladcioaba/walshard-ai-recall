@@ -110,8 +110,17 @@ export async function scanClaude(): Promise<Contribution[]> {
   return out;
 }
 
-/** Best effort when no other source knows the real path: '-Users-x-Work-foo' -> '/Users/x/Work/foo'. */
+/**
+ * Best effort when no other source knows the real path:
+ *   POSIX   '-Users-x-Work-foo' -> '/Users/x/Work/foo'
+ *   Windows 'C--Users-x-foo'    -> 'C:\\Users\\x\\foo'
+ */
 function guessPathFromEncoded(dir: string): string {
+  const drive = /^([A-Za-z])--(.*)$/.exec(dir);
+  if (drive && process.platform === 'win32') {
+    const root = `${drive[1].toUpperCase()}:\\`;
+    return resolveEncoded(root, drive[2]) ?? root + drive[2].replace(/-/g, '\\');
+  }
   return resolveEncoded('/', dir.replace(/^-/, '')) ?? dir.replace(/-/g, '/'); // fallback: lossy, flagged missing later
 }
 

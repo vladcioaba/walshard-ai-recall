@@ -10,6 +10,7 @@ import { search } from './search.ts';
 import { computeStats } from './stats.ts';
 import type { Project, Tool } from './types.ts';
 import { dict, tildify } from './util.ts';
+import { version } from './version.ts';
 
 const UI_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'ui');
 // Bind AND advertise the IPv4 literal: opening "localhost" lets another user squat on [::1]:PORT.
@@ -133,7 +134,7 @@ export async function startServer(opts: ServerOptions): Promise<Choice | undefin
     const route = `${req.method} ${url.pathname}`;
     switch (route) {
       case 'GET /api/config':
-        return json(res, { pick: !!opts.pick });
+        return json(res, { pick: !!opts.pick, version: version() });
       case 'POST /api/ping':
         return json(res, { ok: true });
       case 'POST /api/choose': {
@@ -254,7 +255,8 @@ function openWith(app: string, target: string): void {
   switch (app) {
     case 'browser':
       if (mac) execFile('open', [target], quiet);
-      else if (win) spawn('rundll32', ['url.dll,FileProtocolHandler', target], { detached: true, stdio: 'ignore' }).unref();
+      // verified on Windows: opens the default browser and keeps the #k= fragment
+      else if (win) spawn('rundll32', ['url.dll,FileProtocolHandler', target], { detached: true, stdio: 'ignore' }).on('error', quiet).unref();
       else execFile('xdg-open', [target], quiet);
       return;
     case 'vscode':

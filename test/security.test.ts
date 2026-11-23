@@ -149,6 +149,9 @@ test('HTTP: token, host, cross-site and bundle guards', async () => {
     assert.equal((await get('/api/projects')).status, 401, 'no token');
     assert.equal((await get('/api/projects', { 'x-airecall-token': 'nope'.padEnd(token.length, 'x') })).status, 401, 'bad token');
     assert.equal((await get('/api/projects', { 'x-airecall-token': token, 'sec-fetch-site': 'cross-site' })).status, 403, 'cross-site');
+    const cfg = (await (await get('/api/config', { 'x-airecall-token': token })).json()) as any;
+    const pkgVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+    assert.equal(cfg.version, pkgVersion, 'web shows the packaged version');
     const ok = await get('/api/projects', { 'x-airecall-token': token });
     assert.equal(ok.status, 200);
     assert.equal(ok.headers.get('x-frame-options'), 'DENY');
@@ -168,3 +171,17 @@ test('HTTP: token, host, cross-site and bundle guards', async () => {
 });
 
 test.after(() => fs.rmSync(home, { recursive: true, force: true }));
+
+test('Windows: drive/UNC paths accepted, PowerShell-quoted resume commands', () => {
+  const W = 'win32' as NodeJS.Platform;
+  assert.equal(validSessionId('abc-123'), true);
+  assert.equal(resumeCommand('C:\\Users\\me\\my app', 'claude', 'abc-123', W), "Set-Location -LiteralPath 'C:\\Users\\me\\my app'; claude --resume abc-123");
+  assert.equal(resumeCommand("C:\\it's", 'codex', undefined, W), "Set-Location -LiteralPath 'C:\\it''s'; codex resume");
+  assert.equal(resumeCommand('C:\\a\u2019b', 'claude', undefined, W), "Set-Location -LiteralPath 'C:\\a\u2019\u2019b'; claude --resume");
+  assert.ok(resumeCommand('\\\\server\\share\\proj', 'claude', undefined, W));
+  assert.equal(resumeCommand('relative\\dir', 'claude', undefined, W), undefined);
+  assert.equal(resumeCommand('\\no-drive', 'claude', undefined, W), undefined);
+  assert.equal(resumeCommand('C:\\x', 'claude', '--flag', W), undefined);
+  assert.equal(handoff('C:\\Users\\me\\p', 'copilot-cli', 'id-1', W), 'C:\\Users\\me\\p\tcopilot-cli\tid-1');
+  assert.equal(resumeCommand('C:\\x', 'claude', undefined, 'darwin'), undefined, 'win path not valid on posix');
+});
