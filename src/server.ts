@@ -268,7 +268,16 @@ function openWith(app: string, target: string): void {
     case 'terminal':
       if (mac) execFile('open', ['-a', 'Terminal', target], quiet);
       // no path inside a cmd.exe command line (cmd re-parses %VAR%, ^, & …): use cwd instead
-      else if (win) spawn('cmd', ['/c', 'start', '', 'cmd'], { cwd: target, detached: true, stdio: 'ignore' }).unref();
+      else if (win) {
+        // prefer Windows Terminal (`wt -d <dir>` — argv, no shell); fall back to a new PowerShell window started in cwd
+        const ps = () =>
+          spawn('cmd', ['/c', 'start', '""', 'powershell', '-NoExit'], { cwd: target, detached: true, stdio: 'ignore', windowsVerbatimArguments: true })
+            .on('error', quiet)
+            .unref();
+        const wt = spawn('wt', ['-d', target], { detached: true, stdio: 'ignore' });
+        wt.on('error', ps); // wt.exe not installed
+        wt.unref();
+      }
       else spawn('x-terminal-emulator', [], { cwd: target, detached: true, stdio: 'ignore' }).on('error', quiet).unref();
       return;
     case 'folder':

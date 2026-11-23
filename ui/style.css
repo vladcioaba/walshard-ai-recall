@@ -271,3 +271,12 @@ td .hbar-wrap { width: 120px; }
 .note { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
 .brand h1 .ver { font-size: 11px; font-weight: 500; color: var(--faint); letter-spacing: 0; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+/* resume-a-session list */
+.resume-list { padding: 0; overflow: hidden; }
+.resume-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.resume-row:last-child { border-bottom: 0; }
+.resume-row:hover { background: var(--panel-2); }
+.rr-main { flex: 1; min-width: 0; }
+.rr-main .s-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rr-main .s-sub .badge { margin-right: 4px; }

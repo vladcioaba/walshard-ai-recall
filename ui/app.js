@@ -5,11 +5,12 @@ const $ = (s, el = document) => el.querySelector(s);
 let TOKEN = '';
 try { TOKEN = sessionStorage.getItem('airecall.k') || ''; } catch {}
 {
-  const km = /(?:^#|&)k=([A-Za-z0-9_-]{20,})/.exec(location.hash);
+  const km = /^#k=([A-Za-z0-9_-]{20,})(?:&(.*))?$/.exec(location.hash);
   if (km) {
     TOKEN = km[1];
     try { sessionStorage.setItem('airecall.k', TOKEN); } catch {}
-    history.replaceState(null, '', location.pathname + location.search);
+    // drop the key from the address bar; keep an optional route (#k=<key>&<project>/<tab>)
+    history.replaceState(null, '', location.pathname + location.search + (km[2] ? '#' + km[2] : ''));
   }
 }
 async function api(url, init = {}) {
@@ -255,6 +256,7 @@ function renderPane(p) {
 
 function overviewPane(p) {
   const lastSession = p.sessions[0];
+  const resumable = p.sessions.filter((s) => s.resume); // server-validated commands only
   const recent = p.prompts.filter((x) => !/^[/!]/.test(x.text) && x.text.trim().length > 3).slice(0, 5);
   const projectMem = p.memory.filter((m) => m.type === 'project').slice(0, 4);
   const feedback = p.memory.filter((m) => m.type === 'feedback');
@@ -277,6 +279,23 @@ function overviewPane(p) {
         <div class="s-sub">${TOOL_LABEL[lastSession.tool]} · ${rel(lastSession.end ?? lastSession.start)}${lastSession.branch ? ' · ⎇ ' + esc(lastSession.branch) : ''}${lastSession.userMessages ? ` · ${lastSession.userMessages} messages` : ''}</div>
         ${recent[0] ? `<div class="s-sub" style="margin-top:8px">Last prompt <span class="faint">(${rel(recent[0].ts)})</span>: <span style="color:var(--text)">${esc(trunc(recent[0].text, 240))}</span></div>` : ''}
       </div>` : ''}
+
+    ${resumable.length ? `
+      <h3 class="section-title">Resume a session <span class="faint" style="text-transform:none;letter-spacing:0">· ${resumable.length} of ${p.sessions.length}${resumable.length > 1 ? ', newest first' : ''}</span></h3>
+      <div class="card resume-list">
+        ${resumable.slice(0, 8).map((s, i) => `
+          <div class="resume-row">
+            <div class="rr-main">
+              <div class="s-title">${s.running ? '<span class="dot" style="display:inline-block;margin-right:6px"></span>' : ''}${esc(s.title ?? s.firstPrompt ?? s.id)}</div>
+              <div class="s-sub"><span class="badge ${s.tool}">${TOOL_SHORT[s.tool]}</span> ${rel(s.end ?? s.start)}${s.branch ? ' · ⎇ ' + esc(s.branch) : ''}${s.userMessages ? ` · ${s.userMessages} msg` : ''}${s.running ? ' · <b>running now</b>' : ''}</div>
+            </div>
+            ${state.pick
+              ? `<button class="btn ${i === 0 ? 'primary' : ''}" data-act="choose" data-session="${esc(s.id)}" title="Close this page and resume this session in your terminal">Resume</button>`
+              : `<button class="btn" data-act="copy" data-text="${esc(s.resume)}" title="Copy the command that resumes this session">Copy</button>`}
+          </div>`).join('')}
+        ${resumable.length > 8 ? `<div class="s-sub" style="padding:8px 14px">${resumable.length - 8} older — see the Sessions tab</div>` : ''}
+      </div>
+      ${state.pick ? '<p class="note">“Open in terminal ↵” (top) opens the agent\'s own session list instead of a specific session.</p>' : ''}` : ''}
 
     ${projectMem.length ? `
       <h3 class="section-title">Project memory</h3>
