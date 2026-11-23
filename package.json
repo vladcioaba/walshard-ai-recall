@@ -2,27 +2,51 @@
   "name": "walshard-ai-recall",
   "version": "0.1.0",
   "description": "Walshard AI Recall: find, inspect and resume every AI coding-agent project (Claude Code, Copilot, Codex, VS Code Copilot Chat) \u2014 local only.",
+  "keywords": [
+    "claude-code",
+    "copilot",
+    "codex",
+    "ai-agents",
+    "developer-tools",
+    "cli",
+    "dashboard",
+    "session-manager",
+    "token-usage"
+  ],
+  "homepage": "https://github.com/vladcioaba/walshard-ai-recall#readme",
+  "bugs": {
+    "url": "https://github.com/vladcioaba/walshard-ai-recall/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vladcioaba/walshard-ai-recall.git"
+  },
+  "license": "MIT",
+  "author": "Walshard",
   "type": "module",
-  "private": true,
   "bin": {
     "airecall": "bin/airecall.js"
   },
+  "files": [
+    "bin/",
+    "dist/",
+    "ui/",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
-    "node": ">=23.6"
+    "node": ">=22.13"
   },
   "scripts": {
-    "list": "node src/cli.ts list",
-    "ui": "node src/cli.ts ui",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "node --test 'test/*.test.ts'"
+    "test": "npm run build && node --test \"test/*.test.ts\"",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test",
+    "dev": "node src/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.8.0"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vladcioaba/walshard-ai-recall.git"
   }
 }

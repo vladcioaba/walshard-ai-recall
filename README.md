@@ -34,22 +34,24 @@ everything it reads as hostile:
 
 ## Requirements
 
-Node ≥ 23.6 (runs the TypeScript sources directly, no build step). No runtime dependencies.
+Node ≥ 22.13. No runtime dependencies.
 
 ## Install
 
 ```bash
-npm install        # dev deps only (typescript, for `npm run typecheck`)
-npm link           # puts `airecall` on your PATH
+npm install -g walshard-ai-recall
+airecall init zsh >> ~/.zshrc   # or ~/.bashrc; static function, nothing eval'd at startup
+```
+
+From source (development):
+
+```bash
+git clone https://github.com/vladcioaba/walshard-ai-recall && cd walshard-ai-recall
+npm install && npm run build && npm link
+node src/cli.ts list            # Node ≥ 23.6 runs the TypeScript sources directly
 ```
 
 ## Use
-
-One-time setup (adds a tiny shell function so airecall can `cd` your terminal):
-
-```bash
-airecall init zsh >> ~/.zshrc   # or ~/.bashrc — static function, nothing eval'd at startup
-```
 
 Then:
 
@@ -90,14 +92,14 @@ transcripts/history, falling back to matching folders on disk.
 ## Test
 
 ```bash
-npm test           # builds a fake $HOME with Claude/Copilot/Codex data and scans it
+npm test           # builds, then scans a fake $HOME with Claude/Copilot/Codex data
 npm run typecheck
 ```
 
 ## Layout
 
 ```
-bin/airecall.js           launcher
+bin/airecall.js        launcher (runs dist/)
 src/cli.ts             list / show / pick / ui
 src/scan.ts            merge adapters per project, inspect folders
 src/adapters/*.ts      claude, copilot, vscode, codex

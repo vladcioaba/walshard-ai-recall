@@ -1,3 +1,3 @@
 #!/usr/bin/env node
-// Thin launcher: Node >= 23.6 runs the TypeScript sources directly (type stripping).
-import '../src/cli.ts';
+// Runs the compiled build (dist/). For development without building: `node src/cli.ts`.
+import '../dist/cli.js';
