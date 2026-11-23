@@ -6,6 +6,16 @@ prompts, tokens and cost. Pick one in the browser and your terminal lands in it,
 
 Read-only towards agent folders. Nothing leaves your machine.
 
+![Project view: sessions to resume, tokens and cost](https://raw.githubusercontent.com/vladcioaba/walshard-ai-recall/main/docs/screenshot-project.png)
+
+<details><summary>Usage &amp; cost view</summary>
+
+![Usage and cost across tools, models and projects](https://raw.githubusercontent.com/vladcioaba/walshard-ai-recall/main/docs/screenshot-stats.png)
+
+</details>
+
+<sub>Screenshots use demo data.</sub>
+
 ## Security model
 
 Every agent's prompts, memory and costs end up in one place, so airecall treats its own data and
