@@ -1,6 +1,6 @@
 {
   "name": "walshard-ai-recall",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Walshard AI Recall: find, inspect and resume every AI coding-agent project (Claude Code, Copilot, Codex, VS Code Copilot Chat) — local only.",
   "keywords": [
     "claude-code",

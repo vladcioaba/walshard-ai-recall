@@ -276,7 +276,7 @@ function overviewPane(p) {
       <h3 class="section-title">Where you left off</h3>
       <div class="card" style="padding:14px 16px">
         <div class="s-title">${esc(lastSession.title ?? lastSession.firstPrompt ?? lastSession.id)}</div>
-        <div class="s-sub">${TOOL_LABEL[lastSession.tool]} · ${rel(lastSession.end ?? lastSession.start)}${lastSession.branch ? ' · ⎇ ' + esc(lastSession.branch) : ''}${lastSession.userMessages ? ` · ${lastSession.userMessages} messages` : ''}</div>
+        <div class="s-sub">${TOOL_LABEL[lastSession.tool]} · ${rel(lastSession.end ?? lastSession.start)}${lastSession.branch ? ' · ⎇ ' + esc(lastSession.branch) : ''}${lastSession.userMessages ? ` · ${lastSession.userMessages} message${lastSession.userMessages === 1 ? '' : 's'}` : ''}</div>
         ${recent[0] ? `<div class="s-sub" style="margin-top:8px">Last prompt <span class="faint">(${rel(recent[0].ts)})</span>: <span style="color:var(--text)">${esc(trunc(recent[0].text, 240))}</span></div>` : ''}
       </div>` : ''}
 
