@@ -187,7 +187,7 @@ async function main(argv: string[]): Promise<void> {
       const choice = await startServer({ port, open: !flags.has('--no-open'), pick: pickMode });
       if (!pickMode) return;
       if (!choice) {
-        fail('no project chosen (tab closed or timed out)');
+        fail('no project chosen (closed from the browser, or the tab was closed)');
         process.exit(1);
       }
       const { project, tool, sessionId } = choice;

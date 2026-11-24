@@ -1,6 +1,6 @@
 import type { Contribution, Session, Todo } from '../types.ts';
 import { validSessionId } from '../resume.ts';
-import { HOME, addDaily, clean, dict, eachJsonl, join, num, oneLine, parseFlatYaml, readText, readdir, redact, safeKey, stat, str, text, toMs } from '../util.ts';
+import { HOME, addDaily, clean, dict, eachJsonl, join, num, oneLine, parseFlatYaml, readText, readdir, redact, safeKey, stat, str, text, toMs, Turns } from '../util.ts';
 
 const ROOT = join(HOME, '.copilot', 'session-state');
 
@@ -31,6 +31,7 @@ export async function scanCopilotCli(): Promise<Contribution[]> {
     let outputTokens = 0;
     let metricsUsage: { input: number; output: number; cacheRead: number; cacheWrite: number } | undefined;
     let usageDaily: NonNullable<Session['usageDaily']> = dict();
+    const turns = new Turns();
 
     await eachJsonl(join(dir, 'events.jsonl'), (e) => {
       const ts = toMs(e.timestamp);
@@ -42,11 +43,13 @@ export async function scanCopilotCli(): Promise<Contribution[]> {
       switch (e.type) {
         case 'user.message':
           s.userMessages!++;
+          turns.onPrompt(d.content);
           if (!s.firstPrompt && typeof d.content === 'string') s.firstPrompt = oneLine(redact(d.content), 200);
           break;
         case 'assistant.message':
           s.assistantMessages!++;
           outputTokens += num(d.outputTokens);
+          turns.onReply(d.content, ts);
           break;
         case 'tool.execution_start': {
           s.toolCalls!++;
@@ -93,6 +96,7 @@ export async function scanCopilotCli(): Promise<Contribution[]> {
       }
     });
     s.models = [...models];
+    Object.assign(s, turns.result());
     // shutdown modelMetrics is authoritative; otherwise only streamed output tokens are known
     s.tokens = metricsUsage ?? { input: 0, output: outputTokens, cacheRead: 0, cacheWrite: 0 };
     if (Object.keys(usageDaily).length) s.usageDaily = usageDaily;

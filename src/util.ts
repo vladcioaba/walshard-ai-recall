@@ -249,3 +249,34 @@ export function addDaily(
   m.cacheRead += num(u.cacheRead);
   m.cacheWrite += num(u.cacheWrite);
 }
+
+/** The last lines of an agent reply: control chars stripped, secrets redacted, earlier text dropped. */
+export function replyTail(raw: string, maxLines = 8, maxChars = 900): string {
+  const lines = redact(clean(raw)).split('\n').map((l) => l.trimEnd());
+  while (lines.length && !lines[lines.length - 1]) lines.pop();
+  let out = lines.filter((l, i, a) => l || (a[i - 1] ?? '')).slice(-maxLines).join('\n').trim();
+  if (out.length > maxChars) out = out.slice(-maxChars).replace(/^\S*\s/, '');
+  // don't start inside a code block: drop an orphan closing fence
+  if ((out.match(/^```/gm) ?? []).length % 2) out = out.replace(/^[\s\S]*?^```.*$\n?/m, '');
+  const trimmed = out.length < lines.join('\n').trim().length;
+  return (trimmed ? '… ' : '') + out.trim();
+}
+
+/** Tracks the last prompt and last text reply of one session, in transcript order. */
+export class Turns {
+  private prompt?: string;
+  private reply?: string;
+  private replyAt?: number;
+  onPrompt(txt: unknown): void {
+    if (typeof txt !== 'string' || !txt.trim() || txt.startsWith('<') || txt.startsWith('[Request interrupted')) return;
+    this.prompt = oneLine(redact(txt), 300);
+  }
+  onReply(txt: unknown, ts?: number): void {
+    if (typeof txt !== 'string' || !txt.trim()) return;
+    this.reply = txt;
+    this.replyAt = ts;
+  }
+  result(): { lastPrompt?: string; lastReply?: string; lastReplyAt?: number } {
+    return { lastPrompt: this.prompt, lastReply: this.reply ? replyTail(this.reply) : undefined, lastReplyAt: this.replyAt };
+  }
+}

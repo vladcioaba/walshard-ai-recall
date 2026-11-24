@@ -84,7 +84,9 @@ class HttpError extends Error {
 
 /**
  * Normal mode: runs until Ctrl+C.
- * Pick mode: resolves with the user's choice, or undefined if the tab was closed / timed out.
+ * Pick mode: resolves with the user's choice, or undefined when they press Close in the UI or
+ * the tab goes away (heartbeat stops). No idle timeout: an open tab can stay as long as the user
+ * wants (Ctrl+C also cancels).
  */
 export async function startServer(opts: ServerOptions): Promise<Choice | undefined> {
   // Per-run secret. Host/Origin checks only stop browsers; the token also stops other local
@@ -154,6 +156,14 @@ export async function startServer(opts: ServerOptions): Promise<Choice | undefin
         resolveChoice({ project: p, sessionId: s?.id, tool: s?.tool });
         return;
       }
+      case 'POST /api/close': {
+        // Explicit cancel from the UI's Close button.
+        if (!opts.pick || done) throw new HttpError(404, 'not in pick mode');
+        done = true;
+        json(res, { ok: true });
+        resolveChoice(undefined);
+        return;
+      }
       case 'GET /api/projects': {
         const scan = await getScan(url.searchParams.has('refresh'));
         return json(res, { scannedAt: scan.scannedAt, durationMs: scan.durationMs, errors: scan.errors, projects: scan.projects.map(summary) });
@@ -221,12 +231,15 @@ export async function startServer(opts: ServerOptions): Promise<Choice | undefin
   if (opts.open) openWith('browser', url);
   if (!opts.pick) return new Promise(() => {}); // run until killed
 
-  // Pick mode: also give up if the tab is closed (heartbeat stops) or nobody connects.
-  const started = Date.now();
+  // Pick mode: wait for a choice, an explicit Close, or the tab going away.
+  // No idle/no-connect timeout. The tab pings every 3 s, but browsers throttle
+  // timers in background tabs (Chrome: about once a minute after 5 min hidden),
+  // so the grace period must comfortably exceed that or a still-open tab gets
+  // closed under the user.
+  const TAB_GONE_MS = 150_000;
   const watchdog = setInterval(() => {
-    const now = Date.now();
-    if (lastPing ? now - lastPing > 15_000 : now - started > 180_000) resolveChoice(undefined);
-  }, 1000);
+    if (lastPing && Date.now() - lastPing > TAB_GONE_MS) resolveChoice(undefined);
+  }, 5_000);
   const choice = await chosen;
   clearInterval(watchdog);
   // let the browser receive its response, then stop listening

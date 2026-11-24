@@ -20,6 +20,10 @@ export interface Session {
   running?: boolean;
   /** Token usage per local day (YYYY-MM-DD) per model. */
   usageDaily?: Record<string, Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>>;
+  /** Last thing you asked, and the agent's last text reply (redacted, shortened). Not persisted. */
+  lastPrompt?: string;
+  lastReply?: string;
+  lastReplyAt?: number;
   /** GitHub Copilot billing unit. */
   premiumRequests?: number;
   /** Transcript gone from the agent's dir; known only from airecall's own index. */

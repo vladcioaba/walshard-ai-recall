@@ -187,8 +187,8 @@ function renderDetail() {
   const tokens = p.totals.inputTokens + p.totals.outputTokens;
   const tabs = [
     ['overview', 'Overview', ''],
-    ['memory', 'Memory', p.memory.length],
     ['sessions', 'Sessions', p.sessions.length],
+    ['memory', 'Memory', p.memory.length],
     ['prompts', 'Prompts', p.promptCount],
     ['files', 'Agent files', p.instructions.length],
     ...(p.todos.length || p.plans.length ? [['plans', 'Plans & todos', p.todos.length + p.plans.length]] : []),
@@ -221,9 +221,8 @@ function renderDetail() {
       ${p.git?.branch ? `<span class="tag">⎇ ${esc(p.git.branch)}</span>` : ''}
       ${p.git?.remote ? `<span class="tag">${esc(p.git.remote.replace(/^https?:\/\/|\.git$/g, ''))}</span>` : ''}
     </div>
+    ${factsRow(p)}
     <div class="stats">
-      ${stat('Last active', rel(p.lastActive), day(p.lastActive))}
-      ${stat('First seen', day(p.firstSeen) || '—', p.firstSeen ? rel(p.firstSeen) : '')}
       ${stat('Sessions', p.totals.sessions, claudeSessions.length < p.totals.sessions ? `${claudeSessions.length} Claude` : 'transcripts kept')}
       ${stat('Prompts', fmt(p.promptCount), 'all time (history)')}
       ${stat('Memory', p.memory.length, Object.entries(countBy(p.memory, (m) => m.type ?? 'other')).map(([k, v]) => `${v} ${k}`).join(' · '))}
@@ -260,24 +259,23 @@ function overviewPane(p) {
   const recent = p.prompts.filter((x) => !/^[/!]/.test(x.text) && x.text.trim().length > 3).slice(0, 5);
   const projectMem = p.memory.filter((m) => m.type === 'project').slice(0, 4);
   const feedback = p.memory.filter((m) => m.type === 'feedback');
-  const tools = Object.entries(
-    p.sessions.reduce((a, s) => {
-      for (const [k, v] of Object.entries(s.topTools ?? {})) a[k] = (a[k] ?? 0) + v;
-      return a;
-    }, {}),
-  )
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
-  const maxTool = tools[0]?.[1] ?? 1;
-  const models = [...new Set(p.sessions.flatMap((s) => s.models ?? []))];
 
   return `
     ${lastSession ? `
       <h3 class="section-title">Where you left off</h3>
-      <div class="card" style="padding:14px 16px">
-        <div class="s-title">${esc(lastSession.title ?? lastSession.firstPrompt ?? lastSession.id)}</div>
-        <div class="s-sub">${TOOL_LABEL[lastSession.tool]} · ${rel(lastSession.end ?? lastSession.start)}${lastSession.branch ? ' · ⎇ ' + esc(lastSession.branch) : ''}${lastSession.userMessages ? ` · ${lastSession.userMessages} message${lastSession.userMessages === 1 ? '' : 's'}` : ''}</div>
-        ${recent[0] ? `<div class="s-sub" style="margin-top:8px">Last prompt <span class="faint">(${rel(recent[0].ts)})</span>: <span style="color:var(--text)">${esc(trunc(recent[0].text, 240))}</span></div>` : ''}
+      <div class="card left-off">
+        <div class="lo-head">
+          <div class="rr-main">
+            <div class="s-title">${esc(lastSession.title ?? lastSession.firstPrompt ?? lastSession.id)}</div>
+            <div class="s-sub">${TOOL_LABEL[lastSession.tool]} · ${rel(lastSession.end ?? lastSession.start)}${lastSession.branch ? ' · ⎇ ' + esc(lastSession.branch) : ''}${lastSession.userMessages ? ` · ${lastSession.userMessages} message${lastSession.userMessages === 1 ? '' : 's'}` : ''}</div>
+          </div>
+        </div>
+        ${lastSession.lastPrompt || recent[0] ? `<div class="lo-you"><span class="who">You</span> ${esc(trunc(lastSession.lastPrompt ?? recent[0].text, 300))}</div>` : ''}
+        ${lastSession.lastReply ? `
+          <div class="lo-reply">
+            <div class="who">${esc(TOOL_LABEL[lastSession.tool])} replied${lastSession.lastReplyAt ? ` <span class="faint">· ${rel(lastSession.lastReplyAt)}</span>` : ''}</div>
+            <div class="md">${md(lastSession.lastReply)}</div>
+          </div>` : ''}
       </div>` : ''}
 
     ${resumable.length ? `
@@ -287,7 +285,8 @@ function overviewPane(p) {
           <div class="resume-row">
             <div class="rr-main">
               <div class="s-title">${s.running ? '<span class="dot" style="display:inline-block;margin-right:6px"></span>' : ''}${esc(s.title ?? s.firstPrompt ?? s.id)}</div>
-              <div class="s-sub"><span class="badge ${s.tool}">${TOOL_SHORT[s.tool]}</span> ${rel(s.end ?? s.start)}${s.branch ? ' · ⎇ ' + esc(s.branch) : ''}${s.userMessages ? ` · ${s.userMessages} msg` : ''}${s.running ? ' · <b>running now</b>' : ''}</div>
+              <div class="s-sub"><span class="badge ${s.tool}">${TOOL_SHORT[s.tool]}</span> ${rel(s.end ?? s.start)}${s.branch ? ' · ⎇ ' + esc(s.branch) : ''}${s.userMessages ? ` · ${s.userMessages} msg` : ''}</div>
+              ${s.lastReply ? `<div class="rr-reply" title="Last lines of the agent's last reply">${esc(tail(plain(s.lastReply), 220))}</div>` : ''}
             </div>
             ${state.pick
               ? `<button class="btn ${i === 0 ? 'primary' : ''}" data-act="choose" data-session="${esc(s.id)}" title="Close this page and resume this session in your terminal">Resume</button>`
@@ -309,28 +308,7 @@ function overviewPane(p) {
 
     ${recent.length ? `
       <h3 class="section-title">Recent prompts</h3>
-      <ul class="timeline card" style="padding:4px 16px">${recent.map(promptLi).join('')}</ul>` : ''}
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
-      ${tools.length ? `
-        <div>
-          <h3 class="section-title">Most used tools</h3>
-          <div class="card" style="padding:12px 16px">
-            ${tools.map(([k, v]) => `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between" class="small"><span class="mono">${esc(k)}</span><span class="muted">${v}</span></div><div class="bar"><span style="width:${(v / maxTool) * 100}%"></span></div></div>`).join('')}
-          </div>
-        </div>` : ''}
-      <div>
-        <h3 class="section-title">Details</h3>
-        <dl class="card kv" style="padding:12px 16px">
-          <dt>Path</dt><dd class="mono">${esc(p.path)}</dd>
-          ${models.length ? `<dt>Models</dt><dd>${models.map(esc).join(', ')}</dd>` : ''}
-          ${p.claudeConfig?.mcpServers?.length ? `<dt>MCP servers</dt><dd>${p.claudeConfig.mcpServers.map(esc).join(', ')}</dd>` : ''}
-          ${p.claudeConfig?.allowedTools ? `<dt>Allowed tools</dt><dd>${p.claudeConfig.allowedTools} rules</dd>` : ''}
-          ${p.instructions.length ? `<dt>Agent files</dt><dd>${p.instructions.map((i) => esc(i.name)).join(', ')}</dd>` : ''}
-          ${p.claudeConfig?.lastSessionId ? `<dt>Last session</dt><dd class="mono">${esc(p.claudeConfig.lastSessionId)}</dd>` : ''}
-        </dl>
-      </div>
-    </div>`;
+      <ul class="timeline card" style="padding:4px 16px">${recent.map(promptLi).join('')}</ul>` : ''}`;
 }
 
 function memCard(m) {
@@ -371,6 +349,7 @@ function sessionsPane(p) {
                 <td>
                   <div class="s-title">${s.running ? '<span class="dot" style="display:inline-block;margin-right:6px"></span>' : ''}${esc(s.title ?? '(untitled)')}${s.archived ? ' <span class="badge" style="--c:var(--faint)" title="Transcript deleted by the agent; summary kept by airecall">archived</span>' : ''}</div>
                   ${s.firstPrompt && s.firstPrompt !== s.title ? `<div class="s-sub">${esc(trunc(s.firstPrompt, 140))}</div>` : ''}
+                  ${s.lastReply ? `<div class="rr-reply" title="Last lines of the agent's last reply">${esc(tail(plain(s.lastReply), 220))}</div>` : ''}
                   <div class="s-sub mono">${esc(s.id)}${s.branch ? ' · ⎇ ' + esc(s.branch) : ''}${s.models?.length ? ' · ' + esc(s.models.join(', ')) : ''}${s.linesAdded ? ` · +${s.linesAdded}/−${s.linesRemoved ?? 0}` : ''}</div>
                 </td>
                 <td><span class="badge ${s.tool}">${TOOL_SHORT[s.tool]}</span></td>
@@ -543,13 +522,26 @@ function md(src) {
 
 // ---------- helpers ----------
 function setHash() { history.replaceState(null, '', '#' + encodeURIComponent(state.selected ?? '') + (state.tab !== 'overview' ? '/' + state.tab : '')); }
-function stat(k, v, s = '') { return `<div class="stat"><div class="k">${k}</div><div class="v">${esc(v)}</div>${s ? `<div class="s">${esc(s)}</div>` : ''}</div>`; }
+function factsRow(p) {
+  const models = [...new Set(p.sessions.flatMap((s) => s.models ?? []))];
+  const f = [
+    p.lastActive && ['Last active', `<b title="${esc(new Date(p.lastActive).toLocaleString())}">${rel(p.lastActive)}</b> <span class="faint">${day(p.lastActive)}</span>`],
+    p.firstSeen && ['First seen', `<b>${day(p.firstSeen)}</b> <span class="faint">${rel(p.firstSeen)}</span>`],
+    models.length && ['Models', esc(models.join(', '))],
+    p.claudeConfig?.mcpServers?.length && ['MCP', esc(p.claudeConfig.mcpServers.join(', '))],
+    p.claudeConfig?.allowedTools && ['Allowed tools', `${p.claudeConfig.allowedTools} rules`],
+  ].filter(Boolean);
+  return f.length ? `<dl class="facts">${f.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>` : '';
+}
+function stat(k, v, s = '') { return `<div class="stat" title="${esc(s ? `${k}: ${v} · ${s}` : `${k}: ${v}`)}"><div class="k">${k}</div><div class="v">${esc(v)}</div>${s ? `<div class="s">${esc(s)}</div>` : ''}</div>`; }
 function empty(msg, hint = '') { return `<div class="card" style="padding:28px;text-align:center"><div>${esc(msg)}</div>${hint ? `<div class="muted small" style="margin-top:6px">${esc(hint)}</div>` : ''}</div>`; }
 function countBy(arr, fn) { return arr.reduce((a, x) => ((a[fn(x)] = (a[fn(x)] ?? 0) + 1), a), {}); }
 function fmt(n) { return typeof n === 'number' ? n.toLocaleString() : n; }
 function day(ms) { return ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
 function compact(n) { return Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n); }
 function bytes(n) { return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`; }
+function plain(m) { return String(m ?? '').replace(/```[\s\S]*?(```|$)/g, ' ').replace(/^\s*(?:[-*+]|\d+\.|#+)\s+/gm, '').replace(/[`*_]+/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' ').trim(); }
+function tail(s, n) { s = String(s ?? '').replace(/^… /, ''); return s.length > n ? '…' + s.slice(-(n - 1)).replace(/^\S*\s/, '') : s; }
 function trunc(s, n) { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 function shq(s) { return /^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`; }
 function rel(ms) {
@@ -680,8 +672,20 @@ async function initPick() {
   } catch {}
   if (!state.pick) return;
   document.body.classList.add('pick-mode');
-  $('.sidebar').insertAdjacentHTML('afterbegin', '<div class="pick-banner">Choose a project → <b>Open in terminal</b> (or press Enter). This page closes itself.</div>');
-  setInterval(() => api('/api/ping', { method: 'POST', body: '{}' }).catch(() => {}), 3000);
+  $('.sidebar').insertAdjacentHTML('afterbegin', '<div class="pick-banner"><span>Choose a project → <b>Open in terminal</b> (or press Enter).</span><button type="button" class="pick-close" title="Cancel and stop the airecall server">Close</button></div>');
+  $('.pick-close').addEventListener('click', closePick);
+  // Heartbeat: lets the server notice a closed tab. Ping again as soon as a
+  // throttled background tab becomes visible.
+  const ping = () => api('/api/ping', { method: 'POST', body: '{}' }).catch(() => {});
+  setInterval(ping, 3000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) ping(); });
+}
+
+async function closePick() {
+  const r = await api('/api/close', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(() => null);
+  if (!r?.ok) return toast('Could not reach the airecall server');
+  document.body.innerHTML = `<div class="done"><h2>Closed</h2><p>No project chosen. The airecall server has stopped — you can close this tab.</p></div>`;
+  setTimeout(() => window.close(), 400); // works only if the browser allows it
 }
 
 async function choose(p, sessionId) {

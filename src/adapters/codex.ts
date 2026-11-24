@@ -1,6 +1,6 @@
 import type { Contribution, Session } from '../types.ts';
 import { validSessionId } from '../resume.ts';
-import { HOME, clean, dict, eachJsonl, join, oneLine, readdir, redact, safeKey, stat, str, toMs } from '../util.ts';
+import { HOME, clean, dict, eachJsonl, join, oneLine, readdir, redact, safeKey, stat, str, toMs, Turns } from '../util.ts';
 
 const ROOT = process.env.CODEX_HOME ?? join(HOME, '.codex');
 
@@ -14,6 +14,7 @@ export async function scanCodex(): Promise<Contribution[]> {
     let cwd = '';
     const s: Session = { tool: 'codex', id: file.split('/').pop()!.replace(/\.jsonl$/, ''), file, userMessages: 0, assistantMessages: 0, toolCalls: 0, topTools: dict() };
     const models = new Set<string>();
+    const turns = new Turns();
     await eachJsonl(file, (o) => {
       const ts = toMs(o.timestamp);
       if (ts) {
@@ -34,9 +35,13 @@ export async function scanCodex(): Promise<Contribution[]> {
       if (p.type === 'message' && p.role === 'user') {
         s.userMessages!++;
         const text = Array.isArray(p.content) ? p.content.map((c: any) => c?.text ?? '').join(' ') : '';
+        turns.onPrompt(text);
         if (!s.firstPrompt && text && !text.startsWith('<')) s.firstPrompt = oneLine(redact(text), 200);
       }
-      if (p.type === 'message' && p.role === 'assistant') s.assistantMessages!++;
+      if (p.type === 'message' && p.role === 'assistant') {
+        s.assistantMessages!++;
+        turns.onReply(Array.isArray(p.content) ? p.content.map((c: any) => (typeof c?.text === 'string' ? c.text : '')).join('\n') : '', ts);
+      }
       if (p.type === 'function_call' || p.type === 'local_shell_call') {
         s.toolCalls!++;
         const n = safeKey(p.name) ?? safeKey(p.type);
@@ -45,6 +50,7 @@ export async function scanCodex(): Promise<Contribution[]> {
     });
     if (!cwd || !validSessionId(s.id)) continue;
     s.models = [...models];
+    Object.assign(s, turns.result());
     s.title = s.firstPrompt ? oneLine(s.firstPrompt, 80) : undefined;
     out.push({ path: cwd, tools: ['codex'], sessions: [s] });
   }

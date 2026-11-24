@@ -4,6 +4,7 @@ import { validSessionId } from '../resume.ts';
 import {
   HOME, addDaily, clean, dict, eachJsonl, encodeClaudePath, join, num, oneLine, parseFrontmatter, pidAlive, readJson, readText, readdir, redact,
   safeKey, stat, str, text, toMs,
+  Turns,
 } from '../util.ts';
 
 const ROOT = join(HOME, '.claude');
@@ -175,6 +176,7 @@ async function parseTranscript(file: string, parent?: Parsed): Promise<Parsed | 
   };
   const models = parent?.models ?? new Set<string>();
   const seenMsg = parent?.seenMsg ?? new Set<string>();
+  const turns = parent ? undefined : new Turns();
 
   await eachJsonl(file, (o) => {
     const ts = toMs(o.timestamp);
@@ -204,6 +206,7 @@ async function parseTranscript(file: string, parent?: Parsed): Promise<Parsed | 
         const c = o.message?.content;
         const txt = typeof c === 'string' ? c : Array.isArray(c) ? c.find((b: any) => b?.type === 'text')?.text : undefined;
         const isToolResult = Array.isArray(c) && c.some((b: any) => b?.type === 'tool_result');
+        if (!isToolResult && !o.isMeta && !o.isCompactSummary) turns?.onPrompt(txt);
         if (!isToolResult && typeof txt === 'string' && txt) {
           s.userMessages!++;
           if (!s.firstPrompt && !txt.startsWith('<')) s.firstPrompt = oneLine(redact(txt), 200); // redact BEFORE truncating
@@ -216,6 +219,7 @@ async function parseTranscript(file: string, parent?: Parsed): Promise<Parsed | 
         const model = safeKey(m.model);
         if (model && !model.startsWith('<')) models.add(model);
         for (const b of Array.isArray(m.content) ? m.content : []) {
+          if (!o.isSidechain && b?.type === 'text') turns?.onReply(b.text, ts);
           if (b?.type === 'tool_use') {
             s.toolCalls!++;
             const name = safeKey(b.name);
@@ -249,6 +253,7 @@ async function parseTranscript(file: string, parent?: Parsed): Promise<Parsed | 
   });
 
   s.models = [...models];
+  if (turns) Object.assign(s, turns.result());
   if (parent) return parent;
   if (!cwd) return undefined;
   return { cwd, session: s, models, seenMsg };

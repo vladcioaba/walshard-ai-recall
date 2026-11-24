@@ -80,8 +80,8 @@ function sanitize(e: any): Entry | undefined {
   const s = e?.session;
   if (!s || typeof e.path !== 'string' || !validSessionId(s.id)) return undefined;
   if (!['claude', 'copilot-cli', 'vscode-copilot', 'codex'].includes(s.tool)) return undefined;
-  const { firstPrompt, running, file, archived, title, ...rest } = s;
-  void firstPrompt, running, file, archived;
+  const { firstPrompt, lastPrompt, lastReply, lastReplyAt, running, file, archived, title, ...rest } = s;
+  void firstPrompt, lastPrompt, lastReply, lastReplyAt, running, file, archived;
   return { path: e.path, seenAt: Number(e.seenAt) || 0, session: { ...rest, title: text(title) } };
 }
 
